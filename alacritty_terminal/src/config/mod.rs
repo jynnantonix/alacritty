@@ -121,6 +121,10 @@ pub struct Config<T> {
     #[serde(default, deserialize_with = "option_explicit_none")]
     working_directory: Option<PathBuf>,
 
+    /// Forward stdin to `self.shell`
+    #[serde(default, deserialize_with = "failure_default")]
+    pub inherit_stdin: bool,
+
     /// Debug options
     #[serde(default, deserialize_with = "failure_default")]
     pub debug: Debug,

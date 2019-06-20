@@ -28,6 +28,7 @@ pub struct Options {
     pub live_config_reload: Option<bool>,
     pub print_events: bool,
     pub ref_test: bool,
+    pub inherit_stdin: bool,
     pub dimensions: Option<Dimensions>,
     pub position: Option<Delta<i32>>,
     pub title: Option<String>,
@@ -47,6 +48,7 @@ impl Default for Options {
             live_config_reload: None,
             print_events: false,
             ref_test: false,
+            inherit_stdin: false,
             dimensions: None,
             position: None,
             title: None,
@@ -88,6 +90,11 @@ impl Options {
                     .long("no-live-config-reload")
                     .help("Disable automatic config reloading")
                     .conflicts_with("live-config-reload"),
+            )
+            .arg(
+                Arg::with_name("inherit-stdin")
+                    .long("inherit-stdin")
+                    .help("Forward stdin to the command to be run.  Only useful with `-e`."),
             )
             .arg(
                 Arg::with_name("print-events")
@@ -182,6 +189,10 @@ impl Options {
             options.print_events = true;
         }
 
+        if matches.is_present("inherit-stdin") {
+            options.inherit_stdin = true;
+        }
+
         if matches.is_present("live-config-reload") {
             options.live_config_reload = Some(true);
         } else if matches.is_present("no-live-config-reload") {
@@ -261,6 +272,7 @@ impl Options {
             config.set_working_directory(Some(wd));
         }
         config.shell = self.command.or(config.shell);
+        config.inherit_stdin = self.inherit_stdin;
 
         config.hold = self.hold;
 
