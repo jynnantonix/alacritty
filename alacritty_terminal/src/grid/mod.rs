@@ -15,6 +15,7 @@
 //! A specialized 2d grid implementation optimized for use in a terminal.
 
 use std::cmp::{max, min, Ordering};
+use std::fmt;
 use std::ops::{Deref, Index, IndexMut, Range, RangeFrom, RangeFull, RangeTo};
 
 use serde::{Deserialize, Serialize};
@@ -632,6 +633,15 @@ impl<T> Grid<T> {
     #[inline]
     pub fn display_offset(&self) -> usize {
         self.display_offset
+    }
+}
+
+impl<T: fmt::Display + GridCell> fmt::Display for Grid<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for idx in (0..self.raw.len()).rev() {
+            self.raw[idx].fmt(f)?;
+        }
+        Ok(())
     }
 }
 

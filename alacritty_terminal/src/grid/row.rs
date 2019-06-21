@@ -15,6 +15,7 @@
 //! Defines the Row type which makes up lines in the grid
 
 use std::cmp::{max, min};
+use std::fmt;
 use std::ops::{Index, IndexMut};
 use std::ops::{Range, RangeFrom, RangeFull, RangeTo, RangeToInclusive};
 use std::slice;
@@ -162,6 +163,20 @@ impl<T> Row<T> {
         let mut split = self.inner.split_off(at);
         std::mem::swap(&mut split, &mut self.inner);
         split
+    }
+}
+
+impl<T: fmt::Display + GridCell> fmt::Display for Row<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for c in &self.inner[..self.occ] {
+            c.fmt(f)?;
+        }
+
+        if self.occ > 0 && !self.inner[self.occ - 1].is_wrap() {
+            f.write_str("\n")?;
+        }
+
+        Ok(())
     }
 }
 
