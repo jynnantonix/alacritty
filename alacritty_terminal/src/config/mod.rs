@@ -125,6 +125,10 @@ pub struct Config<T> {
     #[serde(default, deserialize_with = "failure_default")]
     pub inherit_stdin: bool,
 
+    /// Program that receives the contents of the scrollback buffer
+    #[serde(default, deserialize_with = "from_string_or_deserialize")]
+    pub scrollback_handler: Option<Shell<'static>>,
+
     /// Debug options
     #[serde(default, deserialize_with = "failure_default")]
     pub debug: Debug,

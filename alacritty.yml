@@ -331,6 +331,19 @@
 #  args:
 #    - --login
 
+# Scrollback buffer handler
+#
+# You can set `scrollback_handler.program` to the path of the program that the
+# `DumpScrollbackBuffer` command should use.
+# Entries in `scrollback_handler.args` are passed unmodified as arguments to the
+# program.
+#
+# Default:
+#   - alacritty --title alacritty-scrollback --inherit-stdin --command less +G
+# scrollback_handler:
+#   program: alacritty
+#   args: [ --title, alacritty-scrollback, --inherit-stdin, --command, less, +G ]
+
 # Startup directory
 #
 # Directory the shell is started in. If this is unset, or `None`, the working
@@ -486,6 +499,7 @@
 #   - Quit
 #   - ToggleFullscreen
 #   - SpawnNewInstance
+#   - DumpScrollbackBuffer
 #   - ClearLogNotice
 #   - ReceiveChar
 #   - None
@@ -530,7 +544,7 @@
 # binding with the same triggers is defined. To unset a default binding, it can
 # be mapped to the `ReceiveChar` action. Alternatively, you can use `None` for
 # a no-op if you do not wish to receive input characters for that binding.
-#key_bindings:
+key_bindings:
   # (Windows, Linux, and BSD only)
   #- { key: V,        mods: Control|Shift, action: Paste            }
   #- { key: C,        mods: Control|Shift, action: Copy             }
@@ -540,6 +554,7 @@
   #- { key: Add,      mods: Control,       action: IncreaseFontSize }
   #- { key: Subtract, mods: Control,       action: DecreaseFontSize }
   #- { key: Minus,    mods: Control,       action: DecreaseFontSize }
+  - { key: Y,        mods: Command,        action: DumpScrollbackBuffer }
 
   # (Windows only)
   #- { key: Return,   mods: Alt,           action: ToggleFullscreen }

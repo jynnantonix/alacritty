@@ -83,6 +83,7 @@ pub trait ActionContext<T: EventListener> {
     fn terminal(&self) -> &Term<T>;
     fn terminal_mut(&mut self) -> &mut Term<T>;
     fn spawn_new_instance(&mut self);
+    fn dump_scrollback_buffer(&mut self);
     fn change_font_size(&mut self, delta: f32);
     fn reset_font_size(&mut self);
     fn pop_message(&mut self);
@@ -151,6 +152,7 @@ impl<T: EventListener> Execute<T> for Action {
             Action::ClearHistory => ctx.terminal_mut().clear_screen(ClearMode::Saved),
             Action::ClearLogNotice => ctx.pop_message(),
             Action::SpawnNewInstance => ctx.spawn_new_instance(),
+            Action::DumpScrollbackBuffer => ctx.dump_scrollback_buffer(),
             Action::ReceiveChar | Action::None => (),
         }
     }
@@ -825,6 +827,8 @@ mod tests {
         fn clear_selection(&mut self) {}
 
         fn spawn_new_instance(&mut self) {}
+
+        fn dump_scrollback_buffer(&mut self) {}
 
         fn change_font_size(&mut self, _delta: f32) {}
 

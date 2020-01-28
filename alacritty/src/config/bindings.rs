@@ -179,6 +179,9 @@ pub enum Action {
     /// Spawn a new instance of Alacritty.
     SpawnNewInstance,
 
+    /// Dump the contents of the scrollback buffer to a program.
+    DumpScrollbackBuffer,
+
     /// Toggle fullscreen.
     ToggleFullscreen,
 

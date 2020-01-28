@@ -16,9 +16,9 @@
 use std::cmp::{max, min};
 use std::ops::{Index, IndexMut, Range};
 use std::time::{Duration, Instant};
-use std::{io, mem, ptr, str};
+use std::{io, mem, ptr, str, thread};
 
-use log::{debug, trace};
+use log::{debug, trace, warn};
 use serde::{Deserialize, Serialize};
 use unicode_width::UnicodeWidthChar;
 
@@ -1123,6 +1123,24 @@ impl<T> Term<T> {
         std::mem::swap(&mut self.grid, &mut self.alt_grid);
     }
 
+    /// Spawns a new thread to write the contents of the scrollback buffer into `w`.
+    pub fn dump_scrollback_buffer<W: 'static + io::Write + Send>(&self, mut w: W) {
+        // Format the scrollback buffer into a string.
+        let buf = format!("{}", self.grid);
+
+        // Spawn a thread to write out out the content because we don't want the main thread to
+        // block waiting for the write to complete.
+        thread::spawn(move || {
+            if let Err(e) = w.write_all(buf.as_bytes()) {
+                match e.raw_os_error() {
+                    // EPIPE just means that the child exited without reading everything out of the
+                    // pipe.
+                    Some(::libc::EPIPE) => {},
+                    _ => warn!("Failed to write entire scrollback buffer: {}", e),
+                }
+            }
+        });
+    }
     /// Scroll screen down
     ///
     /// Text moves down; clear at bottom

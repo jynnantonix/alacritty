@@ -5,7 +5,10 @@ use std::env;
 #[cfg(unix)]
 use std::fs;
 use std::fs::File;
-use std::io::Write;
+use std::io::{self, Write};
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
+use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -222,6 +225,51 @@ impl<'a, N: Notify + 'a, T: EventListener> input::ActionContext<T> for ActionCon
         }
     }
 
+    fn dump_scrollback_buffer(&mut self) {
+        let (program, args) = if let Some(handler) = self.config.scrollback_handler.as_ref() {
+            ((*handler.program).to_owned(), handler.args.iter().map(|a| &**a).collect())
+        } else {
+            (
+                env::args().next().unwrap(),
+                vec![
+                    "--title",
+                    "alacritty-scrollback",
+                    "--inherit-stdin",
+                    "--command",
+                    "less",
+                    "+G",
+                ],
+            )
+        };
+
+        let cmd = unsafe {
+            Command::new(&program)
+                .args(args)
+                .stdin(Stdio::piped())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .pre_exec(|| {
+                    match ::libc::fork() {
+                        -1 => return Err(io::Error::last_os_error()),
+                        0 => (),
+                        _ => ::libc::exit(0),
+                    }
+
+                    if ::libc::setsid() == -1 {
+                        Err(io::Error::last_os_error())
+                    } else {
+                        Ok(())
+                    }
+                })
+                .spawn()
+        };
+
+        match cmd {
+            Ok(mut child) => self.terminal.dump_scrollback_buffer(child.stdin.take().unwrap()),
+            Err(e) => warn!("Unable to dump scrollback buffer to {}: {}", program, e),
+        }
+    }
+
     fn change_font_size(&mut self, delta: f32) {
         *self.font_size = max(*self.font_size + delta, Size::new(FONT_SIZE_STEP));
         let font = self.config.font.clone().with_size(*self.font_size);
@@ -354,7 +402,7 @@ impl<N: Notify + OnResize> Processor<N> {
                 GlutinEvent::UserEvent(Event::Exit) => {
                     *control_flow = ControlFlow::Exit;
                     return;
-                },
+                }
                 // Process events
                 GlutinEvent::RedrawEventsCleared => {
                     *control_flow = ControlFlow::Wait;
@@ -362,7 +410,7 @@ impl<N: Notify + OnResize> Processor<N> {
                     if event_queue.is_empty() {
                         return;
                     }
-                },
+                }
                 // Buffer events
                 _ => {
                     *control_flow = ControlFlow::Poll;
@@ -370,7 +418,7 @@ impl<N: Notify + OnResize> Processor<N> {
                         event_queue.push(event);
                     }
                     return;
-                },
+                }
             }
 
             let mut terminal = terminal.lock();
@@ -447,7 +495,7 @@ impl<N: Notify + OnResize> Processor<N> {
                 Event::Wakeup => processor.ctx.terminal.dirty = true,
                 Event::Urgent => {
                     processor.ctx.window.set_urgent(!processor.ctx.terminal.is_focused)
-                },
+                }
                 Event::ConfigReload(path) => {
                     processor.ctx.message_buffer.remove_target(LOG_TARGET_CONFIG);
                     processor.ctx.display_update_pending.message_buffer = Some(());
@@ -469,12 +517,12 @@ impl<N: Notify + OnResize> Processor<N> {
 
                         processor.ctx.terminal.dirty = true;
                     }
-                },
+                }
                 Event::Message(message) => {
                     processor.ctx.message_buffer.push(message);
                     processor.ctx.display_update_pending.message_buffer = Some(());
                     processor.ctx.terminal.dirty = true;
-                },
+                }
                 Event::MouseCursorDirty => processor.reset_mouse_cursor(),
                 Event::Exit => (),
             },
@@ -498,7 +546,7 @@ impl<N: Notify + OnResize> Processor<N> {
                         let psize = lsize.to_physical(processor.ctx.size_info.dpr);
                         processor.ctx.display_update_pending.dimensions = Some(psize);
                         processor.ctx.terminal.dirty = true;
-                    },
+                    }
                     KeyboardInput { input, .. } => {
                         processor.key_input(input);
                         if input.state == ElementState::Pressed {
@@ -507,7 +555,7 @@ impl<N: Notify + OnResize> Processor<N> {
                                 processor.ctx.window.set_mouse_visible(false);
                             }
                         }
-                    },
+                    }
                     ReceivedCharacter(c) => processor.received_char(c),
                     MouseInput { state, button, .. } => {
                         if !cfg!(target_os = "macos") || processor.ctx.terminal.is_focused {
@@ -515,7 +563,7 @@ impl<N: Notify + OnResize> Processor<N> {
                             processor.mouse_input(state, button);
                             processor.ctx.terminal.dirty = true;
                         }
-                    },
+                    }
                     CursorMoved { position: lpos, .. } => {
                         let (x, y) = lpos.to_physical(processor.ctx.size_info.dpr).into();
                         let x: i32 = limit(x, 0, processor.ctx.size_info.width as i32);
@@ -523,11 +571,11 @@ impl<N: Notify + OnResize> Processor<N> {
 
                         processor.ctx.window.set_mouse_visible(true);
                         processor.mouse_moved(x as usize, y as usize);
-                    },
+                    }
                     MouseWheel { delta, phase, .. } => {
                         processor.ctx.window.set_mouse_visible(true);
                         processor.mouse_wheel_input(delta, phase);
-                    },
+                    }
                     Focused(is_focused) => {
                         if window_id == processor.ctx.window.window_id() {
                             processor.ctx.terminal.is_focused = is_focused;
@@ -541,11 +589,11 @@ impl<N: Notify + OnResize> Processor<N> {
 
                             processor.on_focus_change(is_focused);
                         }
-                    },
+                    }
                     DroppedFile(path) => {
                         let path: String = path.to_string_lossy().into();
                         processor.ctx.write_to_pty(path.into_bytes());
-                    },
+                    }
                     HiDpiFactorChanged(dpr) => {
                         let dpr_change = (dpr / processor.ctx.size_info.dpr) as f32;
                         let display_update_pending = &mut processor.ctx.display_update_pending;
@@ -565,14 +613,14 @@ impl<N: Notify + OnResize> Processor<N> {
 
                         processor.ctx.terminal.dirty = true;
                         processor.ctx.size_info.dpr = dpr;
-                    },
+                    }
                     CursorLeft { .. } => {
                         processor.ctx.mouse.inside_grid = false;
 
                         if processor.highlighted_url.is_some() {
                             processor.ctx.terminal.dirty = true;
                         }
-                    },
+                    }
                     TouchpadPressure { .. }
                     | CursorEntered { .. }
                     | AxisMotion { .. }
@@ -583,13 +631,13 @@ impl<N: Notify + OnResize> Processor<N> {
                     | Touch(_)
                     | Moved(_) => (),
                 }
-            },
+            }
             GlutinEvent::DeviceEvent { event, .. } => {
                 use glutin::event::DeviceEvent::*;
                 if let ModifiersChanged(modifiers) = event {
                     processor.modifiers_input(modifiers);
                 }
-            },
+            }
             GlutinEvent::Suspended { .. }
             | GlutinEvent::NewEvents { .. }
             | GlutinEvent::MainEventsCleared
@@ -616,14 +664,14 @@ impl<N: Notify + OnResize> Processor<N> {
                     | Moved(_) => true,
                     _ => false,
                 }
-            },
+            }
             GlutinEvent::DeviceEvent { event, .. } => {
                 use glutin::event::DeviceEvent::*;
                 match event {
                     ModifiersChanged { .. } => false,
                     _ => true,
                 }
-            },
+            }
             GlutinEvent::Suspended { .. }
             | GlutinEvent::NewEvents { .. }
             | GlutinEvent::MainEventsCleared
